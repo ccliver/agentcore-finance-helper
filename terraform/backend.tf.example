@@ -1,0 +1,10 @@
+# Copy this file to backend.tf to enable remote state in S3.
+# S3 native locking is used (set use_lockfile = true); DynamoDB locking is deprecated.
+terraform {
+  backend "s3" {
+    bucket       = "my-tf-state-bucket"
+    key          = "agentcore-finance-helper/terraform.tfstate"
+    region       = "us-east-1"
+    use_lockfile = true
+  }
+}

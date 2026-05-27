@@ -1,0 +1,106 @@
+version: "3"
+
+env:
+  AWS_PROFILE: lab
+
+vars:
+  AWS_REGION: '{{.AWS_REGION | default "us-east-1"}}'
+  IMAGE_TAG:
+    sh: git rev-parse --short HEAD 2>/dev/null || date +%s
+
+tasks:
+  default:
+    silent: true
+    cmds:
+      - task -l
+
+  build:
+    desc: Build Docker image for linux/arm64
+    cmds:
+      - docker buildx build --platform linux/arm64 --load -t finance-helper:{{.IMAGE_TAG}} src/
+
+  push:
+    desc: Authenticate to ECR and push image (requires deployed ECR — run deploy first)
+    deps: [build]
+    cmds:
+      - |
+        ECR_URL=$(terraform -chdir=terraform output -raw ecr_repository_url)
+        aws ecr get-login-password --region {{.AWS_REGION}} | docker login --username AWS --password-stdin "$ECR_URL"
+        docker tag finance-helper:{{.IMAGE_TAG}} "$ECR_URL:{{.IMAGE_TAG}}"
+        docker push "$ECR_URL:{{.IMAGE_TAG}}"
+
+  deploy:
+    desc: Full deploy — ECR, push image, then AgentCore Runtime
+    cmds:
+      - terraform -chdir=terraform init
+      - terraform -chdir=terraform apply -target=aws_ecr_repository.finance_helper -auto-approve
+      - task: push
+      - terraform -chdir=terraform apply -var="image_tag={{.IMAGE_TAG}}" -auto-approve
+
+  test:
+    desc: Run pytest via uv
+    dir: src
+    cmds:
+      - uv run pytest -v
+
+  lint:
+    desc: Run ruff check + format check, then pre-commit on all files
+    cmds:
+      - uv run --project src --directory src ruff check .
+      - uv run --project src --directory src ruff format --check .
+      - uvx pre-commit run --all-files
+
+  chat:
+    desc: "Interactive chat session with the deployed runtime. Pass SESSION_ID=<uuid> to resume a previous session."
+    silent: true
+    interactive: true
+    vars:
+      SESSION_ID: '{{.SESSION_ID | default ""}}'
+    cmds:
+      - |
+        RUNTIME_ARN=$(terraform -chdir=terraform output -raw agent_runtime_arn 2>/dev/null)
+        if [ -n "{{.SESSION_ID}}" ]; then
+          SID="{{.SESSION_ID}}"
+        else
+          SID=$(python3 -c "import uuid; print(uuid.uuid4())")
+        fi
+        echo "Session: $SID"
+        echo "Type a message and press Enter. Ctrl-C to quit."
+        echo ""
+        while IFS= read -r -p "You: " PROMPT; do
+          [ -z "$PROMPT" ] && continue
+          PAYLOAD=$(mktemp)
+          TMPOUT=$(mktemp)
+          jq -n --arg p "$PROMPT" '{"prompt":$p}' > "$PAYLOAD"
+          aws bedrock-agentcore invoke-agent-runtime \
+            --agent-runtime-arn "$RUNTIME_ARN" \
+            --payload "fileb://$PAYLOAD" \
+            --runtime-session-id "$SID" \
+            --region {{.AWS_REGION}} \
+            "$TMPOUT" > /dev/null 2>&1
+          echo "Agent: $(jq -r '.response' "$TMPOUT")"
+          rm -f "$PAYLOAD" "$TMPOUT"
+          echo ""
+        done
+
+  invoke:
+    desc: "Send a prompt to the deployed AgentCore Runtime. task invoke PROMPT='your question' SESSION_ID=<uuid>"
+    vars:
+      SESSION_ID: '{{.SESSION_ID | default ""}}'
+      PROMPT: '{{.PROMPT | default "What is compound interest?"}}'
+    cmds:
+      - |
+        RUNTIME_ARN=$(terraform -chdir=terraform output -raw agent_runtime_arn)
+        PAYLOAD=$(mktemp)
+        printf '%s' '{"prompt":"{{.PROMPT}}"}' > "$PAYLOAD"
+        SESSION_ARGS=""
+        if [ -n "{{.SESSION_ID}}" ]; then
+          SESSION_ARGS="--runtime-session-id {{.SESSION_ID}}"
+        fi
+        aws bedrock-agentcore invoke-agent-runtime \
+          --agent-runtime-arn "$RUNTIME_ARN" \
+          --payload "fileb://$PAYLOAD" \
+          $SESSION_ARGS \
+          --region {{.AWS_REGION}} \
+          /dev/stdout
+        rm -f "$PAYLOAD"
