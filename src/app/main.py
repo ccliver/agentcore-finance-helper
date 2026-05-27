@@ -3,7 +3,9 @@ import os
 
 import boto3
 from bedrock_agentcore import BedrockAgentCoreApp, BedrockAgentCoreContext
-from bedrock_agentcore.memory.integrations.strands.session_manager import AgentCoreMemorySessionManager
+from bedrock_agentcore.memory.integrations.strands.session_manager import (
+    AgentCoreMemorySessionManager,
+)
 from bedrock_agentcore.memory.integrations.strands.config import AgentCoreMemoryConfig
 from strands import Agent, tool
 from strands.models import BedrockModel
@@ -47,7 +49,9 @@ def compound_interest(
         monthly_rate = (1 + rate / n) ** (n / 12) - 1
         months = years * 12
         if monthly_rate:
-            contributions_balance = additional_monthly * (((1 + monthly_rate) ** months - 1) / monthly_rate)
+            contributions_balance = additional_monthly * (
+                ((1 + monthly_rate) ** months - 1) / monthly_rate
+            )
         else:
             contributions_balance = additional_monthly * months
 
@@ -82,7 +86,9 @@ def invoke(payload, context: BedrockAgentCoreContext):
         ),
         region_name=AWS_REGION,
     )
-    agent = Agent(model=model, session_manager=session_manager, tools=[compound_interest])
+    agent = Agent(
+        model=model, session_manager=session_manager, tools=[compound_interest]
+    )
     result = agent(payload.get("prompt", ""))
     return {"response": str(result)}
 

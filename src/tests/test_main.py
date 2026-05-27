@@ -4,7 +4,6 @@ os.environ.setdefault("MEMORY_ID", "test-memory-id")
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app, invoke
@@ -17,7 +16,10 @@ def _make_ctx(session_id="sess-1"):
 
 
 def test_invoke_calls_agent():
-    with patch("app.main.AgentCoreMemorySessionManager"), patch("app.main.Agent") as MockAgent:
+    with (
+        patch("app.main.AgentCoreMemorySessionManager"),
+        patch("app.main.Agent") as MockAgent,
+    ):
         mock_instance = MagicMock()
         mock_instance.return_value = MagicMock(__str__=lambda self: "42")
         MockAgent.return_value = mock_instance
@@ -27,7 +29,10 @@ def test_invoke_calls_agent():
 
 
 def test_invoke_empty_prompt():
-    with patch("app.main.AgentCoreMemorySessionManager"), patch("app.main.Agent") as MockAgent:
+    with (
+        patch("app.main.AgentCoreMemorySessionManager"),
+        patch("app.main.Agent") as MockAgent,
+    ):
         mock_instance = MagicMock()
         mock_instance.return_value = MagicMock(__str__=lambda self: "ok")
         MockAgent.return_value = mock_instance
