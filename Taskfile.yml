@@ -37,6 +37,12 @@ tasks:
       - task: push
       - terraform -chdir=terraform apply -var="image_tag={{.IMAGE_TAG}}" -auto-approve
 
+  destroy:
+    desc: Tear down all infrastructure managed by Terraform
+    prompt: "This will destroy all deployed AWS resources. Are you sure?"
+    cmds:
+      - terraform -chdir=terraform destroy -auto-approve
+
   test:
     desc: Run pytest via uv
     dir: src
