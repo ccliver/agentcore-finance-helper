@@ -27,3 +27,20 @@ variable "memory_event_expiry_days" {
   type        = number
   default     = 90
 }
+
+variable "cognito_user_email" {
+  description = "Email address for the initial Cognito user created by Terraform."
+  type        = string
+}
+
+variable "cognito_domain_prefix" {
+  description = "Globally unique prefix for the Cognito hosted UI domain (e.g. finance-helper-abc123)."
+  type        = string
+  default     = "finance-helper-aizahx"
+}
+
+variable "cli_callback_port" {
+  description = "Local port the CLI listens on for the OAuth PKCE callback."
+  type        = number
+  default     = 9999
+}

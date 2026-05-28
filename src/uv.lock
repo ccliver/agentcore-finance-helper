@@ -235,6 +235,8 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "bedrock-agentcore" },
+    { name = "click" },
+    { name = "httpx" },
     { name = "strands-agents" },
 ]
 
@@ -248,6 +250,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "bedrock-agentcore" },
+    { name = "click" },
+    { name = "httpx" },
     { name = "strands-agents" },
 ]
 

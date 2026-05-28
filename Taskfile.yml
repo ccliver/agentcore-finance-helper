@@ -37,11 +37,22 @@ tasks:
       - task: push
       - terraform -chdir=terraform apply -var="image_tag={{.IMAGE_TAG}}" -auto-approve
 
+  user-password:
+    silent: true
+    desc: Print the generated Cognito user password from Terraform state
+    cmds:
+      - terraform -chdir=terraform output -raw cognito_user_password && echo
+
   destroy:
     desc: Tear down all infrastructure managed by Terraform
     prompt: "This will destroy all deployed AWS resources. Are you sure?"
     cmds:
       - terraform -chdir=terraform destroy -auto-approve
+
+  install:
+    desc: Install (or reinstall) the finance-helper CLI locally via uv
+    cmds:
+      - uv tool install --reinstall src/
 
   test:
     desc: Run pytest via uv
