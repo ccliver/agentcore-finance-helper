@@ -78,63 +78,6 @@ resource "aws_bedrockagentcore_memory" "finance_helper" {
   event_expiry_duration = var.memory_event_expiry_days
 }
 
-resource "aws_cognito_user_pool" "finance_helper" {
-  name = "${var.agent_runtime_name}_users"
-
-  password_policy {
-    minimum_length    = 8
-    require_uppercase = true
-    require_numbers   = true
-  }
-
-  auto_verified_attributes = ["email"]
-}
-
-resource "random_password" "cognito_user" {
-  length           = 16
-  special          = true
-  override_special = "!@#$"
-  min_upper        = 1
-  min_lower        = 1
-  min_numeric      = 1
-  min_special      = 1
-}
-
-resource "aws_cognito_user" "default" {
-  user_pool_id = aws_cognito_user_pool.finance_helper.id
-  username     = var.cognito_user_email
-
-  attributes = {
-    email          = var.cognito_user_email
-    email_verified = "true"
-  }
-
-  password       = random_password.cognito_user.result
-  message_action = "SUPPRESS"
-}
-
-resource "aws_cognito_user_pool_domain" "finance_helper" {
-  domain       = var.cognito_domain_prefix
-  user_pool_id = aws_cognito_user_pool.finance_helper.id
-}
-
-resource "aws_cognito_user_pool_client" "cli" {
-  name         = "finance-helper-cli"
-  user_pool_id = aws_cognito_user_pool.finance_helper.id
-
-  generate_secret                      = false
-  allowed_oauth_flows_user_pool_client = true
-  allowed_oauth_flows                  = ["code"]
-  allowed_oauth_scopes                 = ["openid", "email", "profile"]
-  supported_identity_providers         = ["COGNITO"]
-
-  callback_urls = ["http://localhost:${var.cli_callback_port}/callback"]
-  logout_urls   = ["http://localhost:${var.cli_callback_port}/logout"]
-
-  enable_token_revocation       = true
-  prevent_user_existence_errors = "ENABLED"
-}
-
 resource "aws_ssm_parameter" "memory_id" {
   name  = "/agentcore-finance-helper/memory-id"
   type  = "String"
@@ -145,8 +88,8 @@ resource "aws_ssm_parameter" "cli_config" {
   name = "/agentcore-finance-helper/cli-config"
   type = "String"
   value = jsonencode({
-    client_id     = aws_cognito_user_pool_client.cli.id
-    domain        = "https://${var.cognito_domain_prefix}.auth.${var.aws_region}.amazoncognito.com"
+    tenant_id     = var.entra_tenant_id
+    client_id     = var.entra_client_id
     runtime_arn   = aws_bedrockagentcore_agent_runtime.finance_helper.agent_runtime_arn
     callback_port = var.cli_callback_port
   })
@@ -155,6 +98,8 @@ resource "aws_ssm_parameter" "cli_config" {
 resource "aws_bedrockagentcore_agent_runtime" "finance_helper" {
   agent_runtime_name = var.agent_runtime_name
   role_arn           = aws_iam_role.agentcore_runtime.arn
+
+  depends_on = [aws_iam_role_policy.agentcore_runtime]
 
   agent_runtime_artifact {
     container_configuration {
@@ -168,8 +113,8 @@ resource "aws_bedrockagentcore_agent_runtime" "finance_helper" {
 
   authorizer_configuration {
     custom_jwt_authorizer {
-      discovery_url    = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.finance_helper.id}/.well-known/openid-configuration"
-      allowed_audience = [aws_cognito_user_pool_client.cli.id]
+      discovery_url    = "https://login.microsoftonline.com/${var.entra_tenant_id}/v2.0/.well-known/openid-configuration"
+      allowed_audience = [var.entra_client_id]
     }
   }
 }

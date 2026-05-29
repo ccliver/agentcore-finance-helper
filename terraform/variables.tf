@@ -28,15 +28,14 @@ variable "memory_event_expiry_days" {
   default     = 90
 }
 
-variable "cognito_user_email" {
-  description = "Email address for the initial Cognito user created by Terraform."
+variable "entra_tenant_id" {
+  description = "Microsoft Entra Directory (tenant) ID."
   type        = string
 }
 
-variable "cognito_domain_prefix" {
-  description = "Globally unique prefix for the Cognito hosted UI domain (e.g. finance-helper-abc123)."
+variable "entra_client_id" {
+  description = "Microsoft Entra Application (client) ID for the finance-helper-cli app registration."
   type        = string
-  default     = "finance-helper-aizahx"
 }
 
 variable "cli_callback_port" {

@@ -57,7 +57,7 @@ class TokenStore:
         payload_b64 = tokens["id_token"].split(".")[1]
         payload_b64 += "=" * (-len(payload_b64) % 4)
         payload = json.loads(base64.urlsafe_b64decode(payload_b64))
-        return payload.get("email", payload.get("sub", "unknown"))
+        return payload.get("email") or payload.get("preferred_username") or payload.get("sub", "unknown")
 
 
 def get_config() -> dict:
@@ -73,7 +73,7 @@ def refresh_tokens(store: TokenStore, config: dict) -> None:
     if not tokens or not tokens.get("refresh_token"):
         return
     response = httpx.post(
-        f"{config['domain']}/oauth2/token",
+        f"https://login.microsoftonline.com/{config['tenant_id']}/oauth2/v2.0/token",
         data={
             "grant_type": "refresh_token",
             "client_id": config["client_id"],

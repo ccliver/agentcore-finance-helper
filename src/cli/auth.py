@@ -16,7 +16,7 @@ def auth():
 
 @auth.command()
 def login():
-    """Log in with your Cognito account (opens browser)."""
+    """Log in with your Microsoft account (opens browser)."""
     config = get_config()
     store = TokenStore()
 
@@ -54,11 +54,11 @@ def login():
     server_holder[0] = server
 
     auth_url = (
-        f"{config['domain']}/oauth2/authorize"
+        f"https://login.microsoftonline.com/{config['tenant_id']}/oauth2/v2.0/authorize"
         f"?response_type=code"
         f"&client_id={config['client_id']}"
         f"&redirect_uri={urllib.parse.quote(f'http://localhost:{port}/callback', safe='')}"
-        f"&scope=openid+email+profile"
+        f"&scope=openid+email+profile+offline_access"
         f"&code_challenge={code_challenge}"
         f"&code_challenge_method=S256"
     )
@@ -72,7 +72,7 @@ def login():
         sys.exit(1)
 
     response = httpx.post(
-        f"{config['domain']}/oauth2/token",
+        f"https://login.microsoftonline.com/{config['tenant_id']}/oauth2/v2.0/token",
         data={
             "grant_type": "authorization_code",
             "client_id": config["client_id"],
