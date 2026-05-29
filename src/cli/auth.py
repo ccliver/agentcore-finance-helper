@@ -1,20 +1,17 @@
-import sys
 import threading
+import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-import click
 import httpx
+import typer
 
 from cli.tokens import TokenStore, generate_pkce_pair, get_config
 
-
-@click.group()
-def auth():
-    """Authentication commands."""
+auth_app = typer.Typer(help="Authentication commands.")
 
 
-@auth.command()
+@auth_app.command()
 def login():
     """Log in with your Microsoft account (opens browser)."""
     config = get_config()
@@ -63,13 +60,13 @@ def login():
         f"&code_challenge_method=S256"
     )
 
-    click.echo("Opening browser for authentication...")
-    click.launch(auth_url)
+    typer.echo("Opening browser for authentication...")
+    typer.launch(auth_url)
     server.serve_forever()
 
     if result["error"]:
-        click.echo(f"Login failed: {result['error']}", err=True)
-        sys.exit(1)
+        typer.echo(f"Login failed: {result['error']}", err=True)
+        raise typer.Exit(code=1)
 
     response = httpx.post(
         f"https://login.microsoftonline.com/{config['tenant_id']}/oauth2/v2.0/token",
@@ -83,33 +80,27 @@ def login():
     )
     response.raise_for_status()
     store.save(response.json())
-    click.echo(f"Logged in as {store.email()}")
+    typer.echo(f"Logged in as {store.email()}")
 
 
-@auth.command()
+@auth_app.command()
 def logout():
     """Clear stored credentials."""
     TokenStore().clear()
-    click.echo("Logged out.")
+    typer.echo("Logged out.")
 
 
-@auth.command()
+@auth_app.command()
 def status():
     """Show current authentication status."""
-    import time
-
     store = TokenStore()
     tokens = store.load()
     if not tokens:
-        click.echo("Not logged in.")
+        typer.echo("Not logged in.")
         return
 
     expires_in = int(tokens["expires_at"] - time.time())
     if expires_in < 0:
-        click.echo(
-            f"Session expired ({store.email()}). Run `finance-helper auth login`."
-        )
+        typer.echo(f"Session expired ({store.email()}). Run `finance-helper auth login`.")
     else:
-        click.echo(
-            f"Logged in as {store.email()} (token expires in {expires_in // 60}m)"
-        )
+        typer.echo(f"Logged in as {store.email()} (token expires in {expires_in // 60}m)")

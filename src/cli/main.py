@@ -1,13 +1,8 @@
-import click
+import typer
 
-from cli.auth import auth
+from cli.auth import auth_app
 from cli.chat import chat
 
-
-@click.group()
-def cli():
-    """Finance helper — AI-powered financial assistant."""
-
-
-cli.add_command(auth)
-cli.add_command(chat)
+app = typer.Typer(help="Finance helper — AI-powered financial assistant.")
+app.add_typer(auth_app, name="auth")
+app.command()(chat)

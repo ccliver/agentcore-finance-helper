@@ -5,12 +5,12 @@ requires-python = ">=3.12"
 dependencies = [
     "bedrock-agentcore",
     "strands-agents",
-    "click",
+    "typer",
     "httpx",
 ]
 
 [project.scripts]
-finance-helper = "cli.main:cli"
+finance-helper = "cli.main:app"
 
 [dependency-groups]
 dev = [
