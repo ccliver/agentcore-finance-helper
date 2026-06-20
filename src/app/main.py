@@ -67,14 +67,14 @@ def invoke(payload, context: BedrockAgentCoreContext):
             ),
             region_name=AWS_REGION,
         )
-        with MCPClient(
+        mcp = MCPClient(
             lambda: streamable_http_client(
                 GATEWAY_URL,
                 http_client=create_mcp_http_client(auth=_GatewaySigV4()),
             )
-        ) as mcp:
-            agent = Agent(model=model, session_manager=session_manager, tools=mcp.tools)
-            result = agent(payload.get("prompt", ""))
+        )
+        agent = Agent(model=model, session_manager=session_manager, tools=[mcp])
+        result = agent(payload.get("prompt", ""))
         return {"response": str(result)}
     except Exception:
         import traceback
