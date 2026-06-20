@@ -73,7 +73,7 @@ def invoke(payload, context: BedrockAgentCoreContext):
                 http_client=create_mcp_http_client(auth=_GatewaySigV4()),
             )
         ) as mcp:
-            agent = Agent(model=model, session_manager=session_manager, tools=[mcp])
+            agent = Agent(model=model, session_manager=session_manager, tools=mcp.tools)
             result = agent(payload.get("prompt", ""))
         return {"response": str(result)}
     except Exception:
