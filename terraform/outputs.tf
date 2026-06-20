@@ -17,3 +17,8 @@ output "memory_id" {
   description = "AgentCore Memory ID for conversation history."
   value       = aws_bedrockagentcore_memory.finance_helper.id
 }
+
+output "gateway_url" {
+  description = "AgentCore Gateway MCP endpoint URL."
+  value       = aws_bedrockagentcore_gateway.finance_helper.gateway_url
+}

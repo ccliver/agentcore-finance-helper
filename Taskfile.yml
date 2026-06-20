@@ -37,6 +37,16 @@ tasks:
       - task: push
       - terraform -chdir=terraform apply -var="image_tag={{.IMAGE_TAG}}" -auto-approve
 
+  plan:
+    desc: Run terraform plan
+    cmds:
+      - terraform -chdir=terraform plan -var="image_tag={{.IMAGE_TAG}}"
+
+  apply:
+    desc: Run terraform apply without rebuilding the container image
+    cmds:
+      - terraform -chdir=terraform apply -var="image_tag={{.IMAGE_TAG}}" -auto-approve
+
   destroy:
     desc: Tear down all infrastructure managed by Terraform
     prompt: "This will destroy all deployed AWS resources. Are you sure?"

@@ -2,69 +2,49 @@ import functools
 import os
 
 import boto3
+import httpx
+from botocore.auth import SigV4Auth as _BotocoreSigV4
+from botocore.awsrequest import AWSRequest as _AWSRequest
 from bedrock_agentcore import BedrockAgentCoreApp, BedrockAgentCoreContext
 from bedrock_agentcore.memory.integrations.strands.session_manager import (
     AgentCoreMemorySessionManager,
 )
 from bedrock_agentcore.memory.integrations.strands.config import AgentCoreMemoryConfig
-from strands import Agent, tool
+from mcp.client.streamable_http import streamable_http_client
+from mcp.shared._httpx_utils import create_mcp_http_client
+from strands import Agent
 from strands.models import BedrockModel
+from strands.tools.mcp import MCPClient
 
 app = BedrockAgentCoreApp()
 
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+GATEWAY_URL = os.getenv("GATEWAY_URL", "")
+BEDROCK_MODEL_ID = os.getenv(
+    "BEDROCK_MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+)
 _MEMORY_SSM_PARAM = "/agentcore-finance-helper/memory-id"
 
 model = BedrockModel(
-    model_id="us.anthropic.claude-haiku-4-5-20251001-v1:0",
+    model_id=BEDROCK_MODEL_ID,
     region_name=AWS_REGION,
 )
 
 
-@tool
-def compound_interest(
-    principal: float,
-    annual_rate: float,
-    years: int,
-    compounds_per_year: int = 12,
-    additional_monthly: float = 0.0,
-) -> dict:
-    """Calculate compound interest and return the final balance and total interest earned.
+class _GatewaySigV4(httpx.Auth):
+    requires_request_body = True
 
-    Args:
-        principal: Initial investment amount in dollars.
-        annual_rate: Annual interest rate as a percentage (e.g. 5 for 5%).
-        years: Number of years to compound.
-        compounds_per_year: How many times interest compounds per year (default 12 for monthly).
-        additional_monthly: Optional fixed amount added each month (default 0). Use this to
-            model regular contributions such as monthly savings deposits.
-    """
-    rate = annual_rate / 100
-    n = compounds_per_year
-
-    principal_balance = principal * (1 + rate / n) ** (n * years)
-
-    contributions_balance = 0.0
-    if additional_monthly:
-        monthly_rate = (1 + rate / n) ** (n / 12) - 1
-        months = years * 12
-        if monthly_rate:
-            contributions_balance = additional_monthly * (
-                ((1 + monthly_rate) ** months - 1) / monthly_rate
-            )
-        else:
-            contributions_balance = additional_monthly * months
-
-    final_balance = principal_balance + contributions_balance
-    total_contributed = principal + additional_monthly * 12 * years
-
-    return {
-        "final_balance": round(final_balance, 2),
-        "total_interest": round(final_balance - total_contributed, 2),
-        "principal": principal,
-        "total_contributed": round(total_contributed, 2),
-        "years": years,
-    }
+    def auth_flow(self, request: httpx.Request):
+        creds = boto3.Session().get_credentials().get_frozen_credentials()
+        aws_req = _AWSRequest(
+            method=request.method,
+            url=str(request.url),
+            data=request.content,
+            headers=dict(request.headers),
+        )
+        _BotocoreSigV4(creds, "bedrock-agentcore", AWS_REGION).add_auth(aws_req)
+        request.headers.update(dict(aws_req.headers))
+        yield request
 
 
 @functools.lru_cache(maxsize=1)
@@ -86,10 +66,21 @@ def invoke(payload, context: BedrockAgentCoreContext):
         ),
         region_name=AWS_REGION,
     )
-    agent = Agent(
-        model=model, session_manager=session_manager, tools=[compound_interest]
-    )
-    result = agent(payload.get("prompt", ""))
+
+    try:
+        with MCPClient(
+            lambda: streamable_http_client(
+                GATEWAY_URL,
+                http_client=create_mcp_http_client(auth=_GatewaySigV4()),
+            )
+        ) as mcp:
+            agent = Agent(model=model, session_manager=session_manager, tools=[mcp])
+            result = agent(payload.get("prompt", ""))
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        raise
+
     return {"response": str(result)}
 
 

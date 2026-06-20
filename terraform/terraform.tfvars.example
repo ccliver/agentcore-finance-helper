@@ -1,0 +1,6 @@
+# Copy this file to terraform.tfvars and fill in your values.
+# terraform.tfvars is gitignored — never commit real IDs.
+
+# From Azure Portal → App registrations → your app → Overview
+entra_tenant_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+entra_client_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"

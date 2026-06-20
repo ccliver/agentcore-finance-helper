@@ -1,106 +1,26 @@
-import threading
-import time
-import urllib.parse
-from http.server import BaseHTTPRequestHandler, HTTPServer
-
-import httpx
+import boto3
 import typer
 
-from cli.tokens import TokenStore, generate_pkce_pair, get_config
-
-auth_app = typer.Typer(help="Authentication commands.")
+auth_app = typer.Typer(help="Authentication commands.", invoke_without_command=True)
 
 
-@auth_app.command()
-def login():
-    """Log in with your Microsoft account (opens browser)."""
-    config = get_config()
-    store = TokenStore()
+@auth_app.callback()
+def auth_default(ctx: typer.Context):
+    if ctx.invoked_subcommand is None:
+        _show_identity()
 
-    code_verifier, code_challenge = generate_pkce_pair()
-    port = config["callback_port"]
-    result = {"code": None, "error": None}
-    server_holder = [None]
 
-    class CallbackHandler(BaseHTTPRequestHandler):
-        def do_GET(self):
-            parsed = urllib.parse.urlparse(self.path)
-            params = urllib.parse.parse_qs(parsed.query)
-
-            if "code" in params:
-                result["code"] = params["code"][0]
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html")
-                self.end_headers()
-                self.wfile.write(
-                    b"<html><body><h2>Login successful! You can close this tab.</h2></body></html>"
-                )
-            else:
-                result["error"] = params.get(
-                    "error_description", params.get("error", ["Unknown error"])
-                )[0]
-                self.send_response(400)
-                self.end_headers()
-
-            threading.Thread(target=server_holder[0].shutdown, daemon=True).start()
-
-        def log_message(self, format, *args):
-            pass
-
-    server = HTTPServer(("localhost", port), CallbackHandler)
-    server_holder[0] = server
-
-    auth_url = (
-        f"https://login.microsoftonline.com/{config['tenant_id']}/oauth2/v2.0/authorize"
-        f"?response_type=code"
-        f"&client_id={config['client_id']}"
-        f"&redirect_uri={urllib.parse.quote(f'http://localhost:{port}/callback', safe='')}"
-        f"&scope=openid+email+profile+offline_access"
-        f"&code_challenge={code_challenge}"
-        f"&code_challenge_method=S256"
-    )
-
-    typer.echo("Opening browser for authentication...")
-    typer.launch(auth_url)
-    server.serve_forever()
-
-    if result["error"]:
-        typer.echo(f"Login failed: {result['error']}", err=True)
+def _show_identity() -> None:
+    try:
+        identity = boto3.client("sts").get_caller_identity()
+        typer.echo(f"AWS Account: {identity['Account']}")
+        typer.echo(f"Identity:    {identity['Arn']}")
+    except Exception as e:
+        typer.echo(f"No valid AWS credentials found: {e}", err=True)
         raise typer.Exit(code=1)
-
-    response = httpx.post(
-        f"https://login.microsoftonline.com/{config['tenant_id']}/oauth2/v2.0/token",
-        data={
-            "grant_type": "authorization_code",
-            "client_id": config["client_id"],
-            "code": result["code"],
-            "redirect_uri": f"http://localhost:{port}/callback",
-            "code_verifier": code_verifier,
-        },
-    )
-    response.raise_for_status()
-    store.save(response.json())
-    typer.echo(f"Logged in as {store.email()}")
-
-
-@auth_app.command()
-def logout():
-    """Clear stored credentials."""
-    TokenStore().clear()
-    typer.echo("Logged out.")
 
 
 @auth_app.command()
 def status():
-    """Show current authentication status."""
-    store = TokenStore()
-    tokens = store.load()
-    if not tokens:
-        typer.echo("Not logged in.")
-        return
-
-    expires_in = int(tokens["expires_at"] - time.time())
-    if expires_in < 0:
-        typer.echo(f"Session expired ({store.email()}). Run `finance-helper auth login`.")
-    else:
-        typer.echo(f"Logged in as {store.email()} (token expires in {expires_in // 60}m)")
+    """Show current AWS identity."""
+    _show_identity()

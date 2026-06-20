@@ -46,6 +46,13 @@ data "aws_iam_policy_document" "runtime_permissions" {
   }
 
   statement {
+    sid       = "GatewayInvoke"
+    effect    = "Allow"
+    actions   = ["bedrock-agentcore:InvokeGateway"]
+    resources = [aws_bedrockagentcore_gateway.finance_helper.gateway_arn]
+  }
+
+  statement {
     sid       = "SSMReadMemoryId"
     effect    = "Allow"
     actions   = ["ssm:GetParameter"]
@@ -99,6 +106,10 @@ resource "aws_bedrockagentcore_agent_runtime" "finance_helper" {
   agent_runtime_name = var.agent_runtime_name
   role_arn           = aws_iam_role.agentcore_runtime.arn
 
+  environment_variables = {
+    GATEWAY_URL = aws_bedrockagentcore_gateway.finance_helper.gateway_url
+  }
+
   depends_on = [aws_iam_role_policy.agentcore_runtime]
 
   agent_runtime_artifact {
@@ -109,12 +120,5 @@ resource "aws_bedrockagentcore_agent_runtime" "finance_helper" {
 
   network_configuration {
     network_mode = "PUBLIC"
-  }
-
-  authorizer_configuration {
-    custom_jwt_authorizer {
-      discovery_url    = "https://login.microsoftonline.com/${var.entra_tenant_id}/v2.0/.well-known/openid-configuration"
-      allowed_audience = [var.entra_client_id]
-    }
   }
 }
