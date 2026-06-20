@@ -58,16 +58,15 @@ def _get_memory_id() -> str:
 
 @app.entrypoint
 def invoke(payload, context: BedrockAgentCoreContext):
-    session_manager = AgentCoreMemorySessionManager(
-        agentcore_memory_config=AgentCoreMemoryConfig(
-            memory_id=_get_memory_id(),
-            session_id=context.session_id,
-            actor_id=payload.get("actor_id", "default"),
-        ),
-        region_name=AWS_REGION,
-    )
-
     try:
+        session_manager = AgentCoreMemorySessionManager(
+            agentcore_memory_config=AgentCoreMemoryConfig(
+                memory_id=_get_memory_id(),
+                session_id=context.session_id,
+                actor_id=payload.get("actor_id", "default"),
+            ),
+            region_name=AWS_REGION,
+        )
         with MCPClient(
             lambda: streamable_http_client(
                 GATEWAY_URL,
@@ -76,12 +75,10 @@ def invoke(payload, context: BedrockAgentCoreContext):
         ) as mcp:
             agent = Agent(model=model, session_manager=session_manager, tools=[mcp])
             result = agent(payload.get("prompt", ""))
+        return {"response": str(result)}
     except Exception:
         import traceback
-        traceback.print_exc()
-        raise
-
-    return {"response": str(result)}
+        return {"response": f"ERROR: {traceback.format_exc()}"}
 
 
 if __name__ == "__main__":
