@@ -39,7 +39,9 @@ def loan_payment(
     years: int,
     compounds_per_year: int = 12,
 ) -> dict:
-    monthly_rate = (1 + annual_rate / 100 / compounds_per_year) ** (compounds_per_year / 12) - 1
+    monthly_rate = (1 + annual_rate / 100 / compounds_per_year) ** (
+        compounds_per_year / 12
+    ) - 1
     months = years * 12
 
     if monthly_rate:
@@ -66,5 +68,5 @@ TOOLS = {
 
 def lambda_handler(event, context):
     full_name = context.client_context.custom["bedrockAgentCoreToolName"]
-    tool_name = full_name[full_name.index("___") + 3:]
+    tool_name = full_name[full_name.index("___") + 3 :]
     return TOOLS[tool_name](**event)

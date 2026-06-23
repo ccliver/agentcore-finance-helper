@@ -78,6 +78,7 @@ def invoke(payload, context: BedrockAgentCoreContext):
         return {"response": str(result)}
     except Exception:
         import traceback
+
         return {"response": f"ERROR: {traceback.format_exc()}"}
 
 
